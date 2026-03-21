@@ -1,0 +1,2 @@
+source /Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/bootloader/gdbinit/symbols
+source /Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/bootloader/gdbinit/connect
