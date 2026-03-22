@@ -21,7 +21,11 @@ esp_err_t init_nvs_flash_storage()
     // The first boot after layout changes may require an erase before NVS can reopen cleanly.
     esp_err_t err = nvs_flash_init();
     if ((err == ESP_ERR_NVS_NO_FREE_PAGES) || (err == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
-        ESP_RETURN_ON_ERROR(nvs_flash_erase(), kTag, "nvs erase failed");
+        err = nvs_flash_erase();
+        if (err != ESP_OK) {
+            ESP_LOGE(kTag, "nvs erase failed: %s", esp_err_to_name(err));
+            return err;
+        }
         err = nvs_flash_init();
     }
 
@@ -35,12 +39,26 @@ extern "C" void app_main(void)
     ESP_LOGI(kTag, "starting app");
 
     // Bring up persistence first so the UI can start from the last saved state.
-    ESP_ERROR_CHECK(init_nvs_flash_storage());
-    ESP_ERROR_CHECK(s_settings_store.init());
+    esp_err_t err = init_nvs_flash_storage();
+    if (err != ESP_OK) {
+        ESP_LOGE(kTag, "nvs init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = s_settings_store.init();
+    if (err != ESP_OK) {
+        ESP_LOGE(kTag, "settings store init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
     const app::PersistedSettings settings = s_settings_store.load();
 
     // Display initialization also brings up LVGL and touch input.
-    ESP_ERROR_CHECK(app::initialize_display(s_display));
+    err = app::initialize_display(s_display);
+    if (err != ESP_OK) {
+        ESP_LOGE(kTag, "display init failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     // Transport is optional. The UI still works locally if ESP-NOW is unavailable.
     app::LightTransport *transport = nullptr;
@@ -52,7 +70,12 @@ extern "C" void app_main(void)
     }
 
     // Build the main UI once the platform stack is ready.
-    ESP_ERROR_CHECK(app::create_home_screen(s_display, settings, &s_settings_store, transport));
+    err = app::create_home_screen(s_display, settings, &s_settings_store, transport);
+    if (err != ESP_OK) {
+        ESP_LOGE(kTag, "home screen init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
     ESP_LOGI(kTag, "ready");
 
     while (true) {
