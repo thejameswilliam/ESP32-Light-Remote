@@ -8,6 +8,7 @@
 
 namespace app {
 
+// Minimal ESP-NOW sender used by the remote to broadcast the latest light state.
 class LightTransport {
 public:
     LightTransport() = default;
@@ -28,4 +29,3 @@ private:
 };
 
 } // namespace app
-

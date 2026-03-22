@@ -13,6 +13,10 @@ namespace {
 
 constexpr const char *kTag = "home_screen";
 
+constexpr size_t kRgbArcCount = 3;
+constexpr size_t kArcCount = 4;
+constexpr size_t kBrightnessArcIndex = 3;
+
 constexpr int kOuterArcSize = 434;
 constexpr int kOuterArcWidth = 22;
 constexpr int kBrightnessArcSize = 314;
@@ -54,27 +58,28 @@ struct HomeScreenState {
     PersistedSettings settings = {};
     lv_obj_t *screen = nullptr;
     lv_obj_t *preview = nullptr;
-    std::array<lv_obj_t *, 4> arcs = {};
+    std::array<lv_obj_t *, kArcCount> arcs = {};
     std::array<lv_obj_t *, kPresetCount> preset_buttons = {};
     std::array<bool, kPresetCount> ignore_next_preset_click = {};
     int active_arc_index = -1;
-    bool suppress_events = false;
 };
 
-HomeScreenState s_state;
-
-constexpr std::array<ArcSpec, 4> kArcSpecs = {{
+constexpr std::array<ArcSpec, kArcCount> kArcSpecs = {{
     {ControlId::Red, kOuterArcSize, kOuterArcWidth, 0 + (kSegmentGapDegrees / 2), 120 - (kSegmentGapDegrees / 2), 0xE84D4D},
     {ControlId::Green, kOuterArcSize, kOuterArcWidth, 120 + (kSegmentGapDegrees / 2), 240 - (kSegmentGapDegrees / 2), 0x67D46A},
     {ControlId::Blue, kOuterArcSize, kOuterArcWidth, 240 + (kSegmentGapDegrees / 2), 360 - (kSegmentGapDegrees / 2), 0x4C8DFF},
     {ControlId::Brightness, kBrightnessArcSize, kBrightnessArcWidth, 180 + (kBrightnessGapDegrees / 2), 360 - (kBrightnessGapDegrees / 2), kBrightnessColorHex},
 }};
 
+HomeScreenState s_state;
+
+// Returns the live editable light state shown on screen.
 LightState &current_state()
 {
     return s_state.settings.current;
 }
 
+// Saves the current UI state and presets when persistent storage is available.
 void save_settings()
 {
     if (s_state.settings_store == nullptr) {
@@ -87,6 +92,7 @@ void save_settings()
     }
 }
 
+// Sends the current light state to the remote light controller when transport is ready.
 void send_current_state()
 {
     if ((s_state.light_transport == nullptr) || !s_state.light_transport->is_ready()) {
@@ -99,6 +105,7 @@ void send_current_state()
     }
 }
 
+// Small helper to hide or show an LVGL object safely.
 void set_hidden(lv_obj_t *obj, bool hidden)
 {
     if (obj == nullptr) {
@@ -112,6 +119,7 @@ void set_hidden(lv_obj_t *obj, bool hidden)
     }
 }
 
+// Maps a UI control id to the field it edits in the light state.
 uint8_t *state_value_ptr(ControlId id)
 {
     switch (id) {
@@ -128,6 +136,7 @@ uint8_t *state_value_ptr(ControlId id)
     return nullptr;
 }
 
+// Maps a control id to its arc widget index.
 int arc_index_for_id(ControlId id)
 {
     for (size_t i = 0; i < kArcSpecs.size(); ++i) {
@@ -135,9 +144,11 @@ int arc_index_for_id(ControlId id)
             return static_cast<int>(i);
         }
     }
+
     return -1;
 }
 
+// Refreshes the center preview bubble to match the current light state.
 void update_preview_visual()
 {
     if (s_state.preview == nullptr) {
@@ -152,6 +163,7 @@ void update_preview_visual()
     lv_obj_move_foreground(s_state.preview);
 }
 
+// Shows or hides controls based on the power state.
 void update_visibility()
 {
     const bool controls_visible = current_state().power_on;
@@ -159,11 +171,13 @@ void update_visibility()
     for (lv_obj_t *arc : s_state.arcs) {
         set_hidden(arc, !controls_visible);
     }
+
     for (lv_obj_t *button : s_state.preset_buttons) {
         set_hidden(button, !controls_visible);
     }
 }
 
+// Updates one preset button to reflect its stored color.
 void update_preset_button(size_t index)
 {
     if ((index >= kPresetCount) || (s_state.preset_buttons[index] == nullptr)) {
@@ -173,6 +187,7 @@ void update_preset_button(size_t index)
     lv_obj_set_style_bg_color(s_state.preset_buttons[index], preview_color(s_state.settings.presets[index]), 0);
 }
 
+// Refreshes all preset button colors from stored preset values.
 void update_all_preset_buttons()
 {
     for (size_t i = 0; i < kPresetCount; ++i) {
@@ -180,17 +195,24 @@ void update_all_preset_buttons()
     }
 }
 
+// Writes a value into an arc widget without going through any built-in interaction path.
 void set_arc_widget_value(ControlId id, uint8_t value)
 {
     const int index = arc_index_for_id(id);
-    if (index < 0 || s_state.arcs[static_cast<size_t>(index)] == nullptr) {
+    if (index < 0) {
         return;
     }
 
-    lv_arc_set_value(s_state.arcs[static_cast<size_t>(index)], value);
+    lv_obj_t *arc = s_state.arcs[static_cast<size_t>(index)];
+    if (arc == nullptr) {
+        return;
+    }
+
+    lv_arc_set_value(arc, value);
 }
 
-void apply_arc_value(ControlId id, uint8_t value, bool live_preview)
+// Updates a control value in state and keeps its arc widget in sync.
+void apply_arc_value(ControlId id, uint8_t value, bool update_preview)
 {
     uint8_t *state_value = state_value_ptr(id);
     if (state_value == nullptr) {
@@ -198,28 +220,26 @@ void apply_arc_value(ControlId id, uint8_t value, bool live_preview)
     }
 
     *state_value = value;
-    s_state.suppress_events = true;
     set_arc_widget_value(id, value);
-    s_state.suppress_events = false;
 
-    if (live_preview) {
+    if (update_preview) {
         update_preview_visual();
     }
 }
 
+// Pushes the full persisted state into the visible widgets.
 void apply_state_to_controls()
 {
-    s_state.suppress_events = true;
     set_arc_widget_value(ControlId::Red, current_state().red);
     set_arc_widget_value(ControlId::Green, current_state().green);
     set_arc_widget_value(ControlId::Blue, current_state().blue);
     set_arc_widget_value(ControlId::Brightness, current_state().brightness);
-    s_state.suppress_events = false;
 
     update_preview_visual();
     update_visibility();
 }
 
+// Normalizes angles into the 0..359 range used by the ring control logic.
 int normalize_angle(int angle)
 {
     while (angle < 0) {
@@ -228,13 +248,16 @@ int normalize_angle(int angle)
     while (angle >= 360) {
         angle -= 360;
     }
+
     return angle;
 }
 
+// Measures how far a touch point is from the center of an object.
 float point_distance_from_center(lv_obj_t *obj, const lv_point_t &point)
 {
     lv_area_t coords;
     lv_obj_get_coords(obj, &coords);
+
     const int center_x = (coords.x1 + coords.x2) / 2;
     const int center_y = (coords.y1 + coords.y2) / 2;
     const int dx = point.x - center_x;
@@ -242,6 +265,7 @@ float point_distance_from_center(lv_obj_t *obj, const lv_point_t &point)
     return std::sqrt(static_cast<float>(dx * dx + dy * dy));
 }
 
+// Checks whether the touch point lands inside the active band for one arc.
 bool point_hits_arc_band(lv_obj_t *arc, const ArcSpec &spec, const lv_point_t &point)
 {
     if (arc == nullptr) {
@@ -255,6 +279,7 @@ bool point_hits_arc_band(lv_obj_t *arc, const ArcSpec &spec, const lv_point_t &p
     return distance >= inner_radius && distance <= outer_radius;
 }
 
+// Measures how close the touch point is to an arc's centerline.
 float distance_to_arc_centerline(lv_obj_t *arc, const ArcSpec &spec, const lv_point_t &point)
 {
     const float distance = point_distance_from_center(arc, point);
@@ -262,27 +287,33 @@ float distance_to_arc_centerline(lv_obj_t *arc, const ArcSpec &spec, const lv_po
     return std::fabs(distance - centerline);
 }
 
+// Converts a touch point into a 0..359 angle around the ring center.
 int point_to_angle(lv_obj_t *obj, const lv_point_t &point)
 {
     lv_area_t coords;
     lv_obj_get_coords(obj, &coords);
+
     const int center_x = (coords.x1 + coords.x2) / 2;
     const int center_y = (coords.y1 + coords.y2) / 2;
     const float dx = static_cast<float>(point.x - center_x);
     const float dy = static_cast<float>(point.y - center_y);
+
     float angle = std::atan2(dy, dx) * 180.0f / kPi;
     if (angle < 0.0f) {
         angle += 360.0f;
     }
+
     return static_cast<int>(angle + 0.5f);
 }
 
+// Checks whether an angle falls inside a control's active segment.
 bool angle_in_spec(int angle, const ArcSpec &spec)
 {
     const int normalized = normalize_angle(angle);
     return normalized >= spec.start_angle && normalized <= spec.end_angle;
 }
 
+// Maps an angle inside an arc segment to a 0..255 control value.
 uint8_t value_from_angle(int angle, const ArcSpec &spec)
 {
     const int normalized = normalize_angle(angle);
@@ -292,19 +323,20 @@ uint8_t value_from_angle(int angle, const ArcSpec &spec)
     return static_cast<uint8_t>((relative * 255) / span);
 }
 
+// Selects the control that should own a new touch on the ring.
 int pick_active_arc_index(const lv_point_t &point, int angle)
 {
-    constexpr size_t kBrightnessIndex = 3;
     if (
-        point_hits_arc_band(s_state.arcs[kBrightnessIndex], kArcSpecs[kBrightnessIndex], point) &&
-        angle_in_spec(angle, kArcSpecs[kBrightnessIndex])
+        point_hits_arc_band(s_state.arcs[kBrightnessArcIndex], kArcSpecs[kBrightnessArcIndex], point) &&
+        angle_in_spec(angle, kArcSpecs[kBrightnessArcIndex])
     ) {
-        return static_cast<int>(kBrightnessIndex);
+        return static_cast<int>(kBrightnessArcIndex);
     }
 
     float best_distance = 1e9f;
     int best_index = -1;
-    for (size_t i = 0; i < 3; ++i) {
+
+    for (size_t i = 0; i < kRgbArcCount; ++i) {
         if (!point_hits_arc_band(s_state.arcs[i], kArcSpecs[i], point)) {
             continue;
         }
@@ -322,6 +354,7 @@ int pick_active_arc_index(const lv_point_t &point, int angle)
     return best_index;
 }
 
+// Handles all arc interaction from one shared screen-level touch stream.
 void on_touch_arc(lv_event_t *event)
 {
     if (!current_state().power_on || s_state.arcs[0] == nullptr) {
@@ -343,13 +376,9 @@ void on_touch_arc(lv_event_t *event)
         if (s_state.active_arc_index < 0) {
             return;
         }
-
-        const ArcSpec &spec = kArcSpecs[static_cast<size_t>(s_state.active_arc_index)];
-        apply_arc_value(spec.id, value_from_angle(angle, spec), true);
-        return;
     }
 
-    if (code == LV_EVENT_PRESSING) {
+    if (code == LV_EVENT_PRESSED || code == LV_EVENT_PRESSING) {
         if (s_state.active_arc_index < 0) {
             return;
         }
@@ -370,6 +399,7 @@ void on_touch_arc(lv_event_t *event)
     }
 }
 
+// Toggles light power from the center preview bubble.
 void on_preview_clicked(lv_event_t *event)
 {
     (void)event;
@@ -380,6 +410,7 @@ void on_preview_clicked(lv_event_t *event)
     save_settings();
 }
 
+// Handles preset recall on click and preset save on long press.
 void on_preset_event(lv_event_t *event)
 {
     const size_t index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
@@ -392,11 +423,13 @@ void on_preset_event(lv_event_t *event)
             if (!current_state().power_on) {
                 return;
             }
+
             s_state.ignore_next_preset_click[index] = true;
             s_state.settings.presets[index] = current_state();
             s_state.settings.presets[index].power_on = true;
             update_preset_button(index);
             save_settings();
+
             if (s_state.display_stack != nullptr) {
                 play_buzzer_chirp(*s_state.display_stack);
             }
@@ -407,6 +440,7 @@ void on_preset_event(lv_event_t *event)
                 s_state.ignore_next_preset_click[index] = false;
                 return;
             }
+
             s_state.settings.current = s_state.settings.presets[index];
             apply_state_to_controls();
             send_current_state();
@@ -418,6 +452,7 @@ void on_preset_event(lv_event_t *event)
     }
 }
 
+// Creates one visual arc. Touch is handled separately at the screen level.
 lv_obj_t *create_arc(const ArcSpec &spec)
 {
     lv_obj_t *arc = lv_arc_create(s_state.screen);
@@ -449,10 +484,10 @@ lv_obj_t *create_arc(const ArcSpec &spec)
     lv_obj_set_style_pad_all(arc, 6, LV_PART_KNOB);
     lv_obj_clear_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-
     return arc;
 }
 
+// Positions a widget on a circle around screen center using an angle in degrees.
 void position_on_circle(lv_obj_t *obj, int radius, int angle)
 {
     const int x = (radius * lv_trigo_cos(angle)) >> LV_TRIGO_SHIFT;
@@ -460,6 +495,7 @@ void position_on_circle(lv_obj_t *obj, int radius, int angle)
     lv_obj_align(obj, LV_ALIGN_CENTER, x, y);
 }
 
+// Creates one preset button on the lower inner ring.
 lv_obj_t *create_preset_button(size_t index)
 {
     lv_obj_t *button = lv_obj_create(s_state.screen);
@@ -476,10 +512,10 @@ lv_obj_t *create_preset_button(size_t index)
 
     lv_obj_add_event_cb(button, on_preset_event, LV_EVENT_CLICKED, reinterpret_cast<void *>(index));
     lv_obj_add_event_cb(button, on_preset_event, LV_EVENT_LONG_PRESSED, reinterpret_cast<void *>(index));
-
     return button;
 }
 
+// Creates the center preview bubble, which also acts as the power button.
 lv_obj_t *create_preview()
 {
     lv_obj_t *preview = lv_obj_create(s_state.screen);
@@ -506,6 +542,7 @@ esp_err_t create_home_screen(
     LightTransport *light_transport
 )
 {
+    // Build the screen while holding the LVGL lock so widget creation stays thread-safe.
     ESP_RETURN_ON_FALSE(display.display != nullptr, ESP_ERR_INVALID_STATE, kTag, "display not ready");
     ESP_RETURN_ON_FALSE(lvgl_port_lock(0), ESP_ERR_TIMEOUT, kTag, "lvgl lock failed");
 
@@ -529,9 +566,11 @@ esp_err_t create_home_screen(
     for (size_t i = 0; i < kArcSpecs.size(); ++i) {
         s_state.arcs[i] = create_arc(kArcSpecs[i]);
     }
+
     for (size_t i = 0; i < kPresetCount; ++i) {
         s_state.preset_buttons[i] = create_preset_button(i);
     }
+
     s_state.preview = create_preview();
 
     lv_obj_add_event_cb(s_state.screen, on_touch_arc, LV_EVENT_PRESSED, nullptr);

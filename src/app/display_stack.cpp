@@ -49,6 +49,8 @@ constexpr uint32_t kPixelClockHz = 12 * 1000 * 1000;
 constexpr uint32_t kBounceLines = 40;
 constexpr uint32_t kBouncePixels = kDisplayWidth * kBounceLines;
 
+// Minimal panel-IO adapter so the ST7701 driver can send setup commands over the
+// board's unusual 3-wire control bus while pixel data flows over the RGB bus.
 struct PanelControlIo {
     esp_lcd_panel_io_t base;
     DisplayStack *stack = nullptr;
@@ -129,6 +131,7 @@ esp_err_t expander_set_output(DisplayStack &stack, uint8_t bit, bool level)
 
 esp_err_t init_i2c_bus(DisplayStack &stack)
 {
+    // The expander and touch controller share one synchronous I2C bus.
     const i2c_master_bus_config_t bus_config = {
         .i2c_port = I2C_NUM_0,
         .sda_io_num = GPIO_NUM_15,
@@ -158,6 +161,7 @@ esp_err_t init_i2c_bus(DisplayStack &stack)
 
 esp_err_t bootstrap_expander(DisplayStack &stack)
 {
+    // The expander controls LCD reset, touch reset, LCD chip-select, and the buzzer.
     ESP_RETURN_ON_ERROR(expander_write_register(stack.expander, kExpanderRegConfig, 0x78), kTag, "expander dir failed");
     s_expander_output = 0x07;
     ESP_RETURN_ON_ERROR(expander_write_register(stack.expander, kExpanderRegOutput, s_expander_output), kTag, "expander out failed");
@@ -179,6 +183,7 @@ esp_err_t bootstrap_expander(DisplayStack &stack)
 
 esp_err_t panel_spi_init_gpios()
 {
+    // The ST7701 control path is bit-banged on two GPIOs. The backlight is a plain GPIO.
     const gpio_config_t config = {
         .pin_bit_mask = BIT64(kPanelSpiClockGpio) | BIT64(kPanelSpiDataGpio) | BIT64(kBacklightGpio),
         .mode = GPIO_MODE_OUTPUT,
@@ -275,6 +280,7 @@ esp_err_t panel_control_io_register_callbacks(esp_lcd_panel_io_t *io, const esp_
 
 esp_lcd_panel_io_handle_t create_panel_control_io(DisplayStack &stack)
 {
+    // The RGB panel driver expects an esp_lcd_panel_io implementation for command writes.
     auto *panel_io = static_cast<PanelControlIo *>(calloc(1, sizeof(PanelControlIo)));
     if (panel_io == nullptr) {
         return nullptr;
@@ -291,6 +297,7 @@ esp_lcd_panel_io_handle_t create_panel_control_io(DisplayStack &stack)
 
 esp_err_t init_panel(DisplayStack &stack)
 {
+    // These timing values are the stable baseline we arrived at after debugging panel artifacts.
     ESP_LOGI(
         kTag,
         "rgb timing pclk=%" PRIu32 " bounce_lines=%" PRIu32 " bounce_px=%" PRIu32,
@@ -385,6 +392,7 @@ esp_err_t init_panel(DisplayStack &stack)
 
 esp_err_t init_lvgl(DisplayStack &stack)
 {
+    // LVGL is configured to render directly into the RGB display path with bounce buffers enabled.
     ESP_LOGI(kTag, "lvgl init start");
 
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -442,6 +450,8 @@ esp_err_t init_lvgl(DisplayStack &stack)
 
 void lvgl_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
+    // The touch controller only pulses IRQ on state changes, so we keep a short poll budget
+    // after each IRQ to make drags and long-presses feel continuous to LVGL.
     auto *stack = static_cast<DisplayStack *>(lv_indev_get_driver_data(indev));
     if ((stack == nullptr) || (stack->touch == nullptr)) {
         data->state = LV_INDEV_STATE_RELEASED;
@@ -504,6 +514,7 @@ void IRAM_ATTR touch_interrupt_callback(esp_lcd_touch_handle_t tp)
 
 esp_err_t init_touch(DisplayStack &stack)
 {
+    // Touch is exposed to LVGL as a normal pointer device, but reads are still IRQ-gated.
     ESP_LOGI(kTag, "touch init start");
 
     const esp_lcd_panel_io_i2c_config_t touch_io_cfg = {
@@ -563,8 +574,9 @@ esp_err_t init_touch(DisplayStack &stack)
 
 esp_err_t initialize_display(DisplayStack &stack)
 {
+    // Bring up the hardware in dependency order: panel GPIOs, shared I2C bus, expander,
+    // LCD panel, LVGL display, then touch input.
     ESP_LOGI(kTag, "bootstrapping display");
-    esp_rom_printf("display: bootstrapping\r\n");
 
     ESP_LOGI(kTag, "step 1: panel gpio init");
     ESP_RETURN_ON_ERROR(panel_spi_init_gpios(), kTag, "panel gpio init failed");
@@ -586,6 +598,7 @@ esp_err_t initialize_display(DisplayStack &stack)
 
 esp_err_t play_buzzer_chirp(const DisplayStack &stack, uint32_t duration_ms)
 {
+    // The buzzer is a simple on/off expander output, so feedback is just a short pulse.
     auto &mutable_stack = const_cast<DisplayStack &>(stack);
     ESP_RETURN_ON_FALSE(mutable_stack.expander != nullptr, ESP_ERR_INVALID_STATE, kTag, "expander not ready");
 

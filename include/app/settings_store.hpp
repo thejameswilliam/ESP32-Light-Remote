@@ -13,6 +13,7 @@ struct PersistedSettings {
     std::array<LightState, kPresetCount> presets = {};
 };
 
+// Thin NVS-backed store for the current light state and saved presets.
 class SettingsStore {
 public:
     SettingsStore() = default;
@@ -27,4 +28,3 @@ private:
 };
 
 } // namespace app
-
