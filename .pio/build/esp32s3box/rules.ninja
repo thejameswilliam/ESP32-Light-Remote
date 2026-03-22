@@ -1879,6 +1879,54 @@ rule C_STATIC_LIBRARY_LINKER____idf_wifi_provisioning
 #############################################
 # Rule for compiling C files.
 
+rule C_COMPILER____idf_lvgl__lvgl
+  depfile = $DEP_FILE
+  deps = gcc
+  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  description = Building C object $out
+
+
+#############################################
+# Rule for compiling CXX files.
+
+rule CXX_COMPILER____idf_lvgl__lvgl
+  depfile = $DEP_FILE
+  deps = gcc
+  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-g++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building CXX object $out
+
+
+#############################################
+# Rule for linking C static library.
+
+rule C_STATIC_LIBRARY_LINKER____idf_lvgl__lvgl
+  command = $PRE_LINK && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E remove $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ar qc $TARGET_FILE $LINK_FLAGS $in && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ranlib $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E touch $TARGET_FILE && $POST_BUILD
+  description = Linking C static library $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling C files.
+
+rule C_COMPILER__lvgl_port_lib
+  depfile = $DEP_FILE
+  deps = gcc
+  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  description = Building C object $out
+
+
+#############################################
+# Rule for linking CXX static library.
+
+rule CXX_STATIC_LIBRARY_LINKER__lvgl_port_lib
+  command = $PRE_LINK && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E remove $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ar qc $TARGET_FILE $LINK_FLAGS $in && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ranlib $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E touch $TARGET_FILE && $POST_BUILD
+  description = Linking CXX static library $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling C files.
+
 rule C_COMPILER____idf_espressif__esp-lib-utils
   depfile = $DEP_FILE
   deps = gcc
@@ -1960,54 +2008,6 @@ rule CXX_COMPILER____idf_espressif__esp32_display_panel
 rule C_STATIC_LIBRARY_LINKER____idf_espressif__esp32_display_panel
   command = $PRE_LINK && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E remove $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ar qc $TARGET_FILE $LINK_FLAGS $in && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ranlib $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E touch $TARGET_FILE && $POST_BUILD
   description = Linking C static library $TARGET_FILE
-  restat = $RESTAT
-
-
-#############################################
-# Rule for compiling C files.
-
-rule C_COMPILER____idf_lvgl__lvgl
-  depfile = $DEP_FILE
-  deps = gcc
-  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
-  description = Building C object $out
-
-
-#############################################
-# Rule for compiling CXX files.
-
-rule CXX_COMPILER____idf_lvgl__lvgl
-  depfile = $DEP_FILE
-  deps = gcc
-  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-g++  $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
-  description = Building CXX object $out
-
-
-#############################################
-# Rule for linking C static library.
-
-rule C_STATIC_LIBRARY_LINKER____idf_lvgl__lvgl
-  command = $PRE_LINK && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E remove $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ar qc $TARGET_FILE $LINK_FLAGS $in && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ranlib $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E touch $TARGET_FILE && $POST_BUILD
-  description = Linking C static library $TARGET_FILE
-  restat = $RESTAT
-
-
-#############################################
-# Rule for compiling C files.
-
-rule C_COMPILER__lvgl_port_lib
-  depfile = $DEP_FILE
-  deps = gcc
-  command = /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
-  description = Building C object $out
-
-
-#############################################
-# Rule for linking CXX static library.
-
-rule CXX_STATIC_LIBRARY_LINKER__lvgl_port_lib
-  command = $PRE_LINK && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E remove $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ar qc $TARGET_FILE $LINK_FLAGS $in && /Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-ranlib $TARGET_FILE && /Users/jameswjohnson/.platformio/packages/tool-cmake/bin/cmake -E touch $TARGET_FILE && $POST_BUILD
-  description = Linking CXX static library $TARGET_FILE
   restat = $RESTAT
 
 

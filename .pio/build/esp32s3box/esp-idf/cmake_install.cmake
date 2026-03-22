@@ -554,6 +554,16 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/lvgl__lvgl/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/espressif__esp_lvgl_port/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/espressif__esp-lib-utils/cmake_install.cmake")
 endif()
 
@@ -565,16 +575,6 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
   include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/espressif__esp32_display_panel/cmake_install.cmake")
-endif()
-
-if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  # Include the install script for the subdirectory.
-  include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/lvgl__lvgl/cmake_install.cmake")
-endif()
-
-if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  # Include the install script for the subdirectory.
-  include("/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/espressif__esp_lvgl_port/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)

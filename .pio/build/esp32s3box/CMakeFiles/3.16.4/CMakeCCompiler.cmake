@@ -71,6 +71,6 @@ endif()
 
 
 set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include-fixed;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/xtensa-esp-elf/include")
-set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
-set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "gcc;c;nosys;c;gcc")
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/esp32s3;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/xtensa-esp-elf/lib/esp32s3;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/lib/gcc;/Users/jameswjohnson/.platformio/packages/toolchain-xtensa-esp-elf/xtensa-esp-elf/lib")
 set(CMAKE_C_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")

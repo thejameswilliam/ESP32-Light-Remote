@@ -1,0 +1,8 @@
+dependencies:
+  espressif/esp32_display_panel:
+    version: "1.0.4"
+  espressif/esp_lvgl_port:
+    version: "2.7.2"
+  lvgl/lvgl:
+    version: "9.5.0"
+

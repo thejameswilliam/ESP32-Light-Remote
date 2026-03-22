@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "touchExplore",
-    "project_version":    "1",
+    "project_version":    "c1e0409-dirty",
     "project_path":       "/Users/jameswjohnson/Documents/ESP32/touchExplore",
     "idf_path":           "/Users/jameswjohnson/.platformio/packages/framework-espidf",
     "build_dir":          "/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box",
@@ -1520,13 +1520,13 @@
             "dir": "/Users/jameswjohnson/Documents/ESP32/touchExplore/src",
             "type": "LIBRARY",
             "lib": "__idf_src",
-            "reqs": [],
-            "priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port" ],
+            "reqs": [ "driver", "esp_event", "esp_lcd", "esp_netif", "esp_timer", "esp_wifi", "nvs_flash", "espressif__esp_lvgl_port", "espressif__esp32_display_panel" ],
+            "priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port", "lvgl__lvgl" ],
             "managed_reqs": [],
-            "managed_priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port" ],
+            "managed_priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port", "lvgl__lvgl" ],
             "file": "/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box/esp-idf/src/libsrc.a",
-            "sources": [ "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/CMakeLists.txt", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/display_stack.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/home_screen.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/light_transport.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/preset_store.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/runtime_diagnostics.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/settings_store.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/idf_component.yml", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/main.cpp" ],
-            "include_dirs": []
+            "sources": [ "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/main.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/display_stack.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/home_screen.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/light_transport.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/preset_store.cpp", "/Users/jameswjohnson/Documents/ESP32/touchExplore/src/app/settings_store.cpp" ],
+            "include_dirs": [ ".", "../include" ]
         },
         "tcp_transport": {
             "alias": "idf::tcp_transport",
@@ -2958,11 +2958,11 @@
             "prefix": "idf",
             "dir": "/Users/jameswjohnson/Documents/ESP32/touchExplore/src",
             "lib": "__idf_src",
-            "reqs": [],
-            "priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port" ],
+            "reqs": [ "driver", "esp_event", "esp_lcd", "esp_netif", "esp_timer", "esp_wifi", "nvs_flash", "espressif__esp_lvgl_port", "espressif__esp32_display_panel" ],
+            "priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port", "lvgl__lvgl" ],
             "managed_reqs": [],
-            "managed_priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port" ],
-            "include_dirs": []
+            "managed_priv_reqs": [ "espressif__esp32_display_panel", "espressif__esp_lvgl_port", "lvgl__lvgl" ],
+            "include_dirs": [ ".", "../include" ]
         },
         "espressif__esp-lib-utils": {
             "alias": "idf::espressif__esp-lib-utils",
