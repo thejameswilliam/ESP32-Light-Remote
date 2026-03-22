@@ -26,4 +26,3 @@ esp_err_t initialize_display(DisplayStack &stack);
 esp_err_t play_buzzer_chirp(const DisplayStack &stack, uint32_t duration_ms = 35);
 
 } // namespace app
-

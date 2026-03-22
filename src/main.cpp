@@ -1,54 +1,40 @@
-#include <memory>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <cinttypes>
 #include "esp_check.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
+#include "esp_rom_sys.h"
+#include <cstdio>
 #include "app/display_stack.hpp"
 #include "app/home_screen.hpp"
-#include "app/light_transport.hpp"
-#include "app/settings_store.hpp"
 
 namespace {
 
 constexpr const char *kTag = "app";
-
 app::DisplayStack s_display;
-app::SettingsStore s_settings_store;
-app::LightTransport s_transport;
-
-esp_err_t init_nvs()
-{
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_RETURN_ON_ERROR(nvs_flash_erase(), kTag, "nvs erase failed");
-        return nvs_flash_init();
-    }
-    return err;
-}
 
 } // namespace
 
 extern "C" void app_main(void)
 {
+    esp_rom_printf("hello from app_main\r\n");
+    std::printf("printf: app_main entered\n");
+    std::fflush(stdout);
     ESP_LOGI(kTag, "starting app");
+    ESP_LOGI(kTag, "display init begins in 2000 ms");
 
-    ESP_ERROR_CHECK(init_nvs());
-    ESP_ERROR_CHECK(s_settings_store.init());
-
-    const app::PersistedSettings settings = s_settings_store.load();
-
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_rom_printf("app: initializing display\r\n");
     ESP_ERROR_CHECK(app::initialize_display(s_display));
+    ESP_LOGI(kTag, "building home screen");
+    ESP_ERROR_CHECK(app::create_home_screen(s_display));
+    ESP_LOGI(kTag, "ui ready");
 
-    esp_err_t transport_err = s_transport.init();
-    if (transport_err != ESP_OK) {
-        ESP_LOGW(kTag, "light transport disabled: %s", esp_err_to_name(transport_err));
+    uint32_t heartbeat = 0;
+    while (true) {
+        ESP_LOGI(kTag, "heartbeat=%" PRIu32, heartbeat++);
+        std::printf("printf heartbeat=%" PRIu32 "\n", heartbeat);
+        std::fflush(stdout);
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
-
-    ESP_ERROR_CHECK(app::create_home_screen(
-        s_display,
-        s_settings_store,
-        transport_err == ESP_OK ? &s_transport : nullptr,
-        settings
-    ));
-
-    ESP_LOGI(kTag, "ready");
 }
