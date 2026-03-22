@@ -40,6 +40,8 @@ constexpr bool kBuzzerIdleLevel = false;
 constexpr bool kBuzzerActiveLevel = true;
 // On this board the touch IRQ idles high and asserts low on touch.
 constexpr int kTouchInterruptActiveLevel = 0;
+constexpr uint8_t kTouchPollBudgetOnIrq = 8;
+constexpr uint8_t kTouchPollBudgetOnTouch = 24;
 
 constexpr uint16_t kDisplayWidth = 480;
 constexpr uint16_t kDisplayHeight = 480;
@@ -51,6 +53,9 @@ struct PanelControlIo {
     esp_lcd_panel_io_t base;
     DisplayStack *stack = nullptr;
 };
+
+volatile bool s_touch_irq_pending = false;
+uint8_t s_touch_poll_budget = 0;
 
 static const esp_panel_lcd_vendor_init_cmd_t kPanelInitCommands[] = {
     {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0},
@@ -443,7 +448,11 @@ void lvgl_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
         return;
     }
 
-    if (!is_touch_interrupt_active()) {
+    if (s_touch_irq_pending && (s_touch_poll_budget < kTouchPollBudgetOnIrq)) {
+        s_touch_poll_budget = kTouchPollBudgetOnIrq;
+    }
+
+    if (!s_touch_irq_pending && (s_touch_poll_budget == 0) && !is_touch_interrupt_active()) {
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
@@ -455,6 +464,9 @@ void lvgl_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
             ESP_LOGW(kTag, "touch read failed err=0x%x", read_err);
             ++error_log_count;
         }
+        if (s_touch_poll_budget > 0) {
+            --s_touch_poll_budget;
+        }
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
@@ -464,11 +476,16 @@ void lvgl_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
     uint16_t strength = 0;
     uint8_t points = 0;
     const bool touched = esp_lcd_touch_get_coordinates(stack->touch, &x, &y, &strength, &points, 1);
+    s_touch_irq_pending = false;
     if (!touched || (points == 0)) {
+        if (s_touch_poll_budget > 0) {
+            --s_touch_poll_budget;
+        }
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
 
+    s_touch_poll_budget = kTouchPollBudgetOnTouch;
     data->point.x = x;
     data->point.y = y;
     data->state = LV_INDEV_STATE_PRESSED;
@@ -481,6 +498,7 @@ void IRAM_ATTR touch_interrupt_callback(esp_lcd_touch_handle_t tp)
         return;
     }
 
+    s_touch_irq_pending = true;
     lvgl_port_task_wake(LVGL_PORT_EVENT_TOUCH, stack->touch_indev);
 }
 
@@ -525,7 +543,7 @@ esp_err_t init_touch(DisplayStack &stack)
     ESP_RETURN_ON_FALSE(lvgl_port_lock(0), ESP_ERR_TIMEOUT, kTag, "lvgl lock failed");
     stack.touch_indev = lv_indev_create();
     lv_indev_set_type(stack.touch_indev, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_mode(stack.touch_indev, LV_INDEV_MODE_EVENT);
+    lv_indev_set_mode(stack.touch_indev, LV_INDEV_MODE_TIMER);
     lv_indev_set_disp(stack.touch_indev, stack.display);
     lv_indev_set_read_cb(stack.touch_indev, lvgl_touchpad_read);
     lv_indev_set_driver_data(stack.touch_indev, &stack);
@@ -568,9 +586,16 @@ esp_err_t initialize_display(DisplayStack &stack)
 
 esp_err_t play_buzzer_chirp(const DisplayStack &stack, uint32_t duration_ms)
 {
-    (void)stack;
-    (void)duration_ms;
-    return ESP_OK;
+    auto &mutable_stack = const_cast<DisplayStack &>(stack);
+    ESP_RETURN_ON_FALSE(mutable_stack.expander != nullptr, ESP_ERR_INVALID_STATE, kTag, "expander not ready");
+
+    ESP_RETURN_ON_ERROR(
+        expander_set_output(mutable_stack, kExpanderBitBuzzer, kBuzzerActiveLevel),
+        kTag,
+        "buzzer on failed"
+    );
+    vTaskDelay(pdMS_TO_TICKS(duration_ms));
+    return expander_set_output(mutable_stack, kExpanderBitBuzzer, kBuzzerIdleLevel);
 }
 
 } // namespace app
