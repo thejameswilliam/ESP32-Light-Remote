@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "touchExplore",
-    "project_version":    "8ac6dbd-dirty",
+    "project_version":    "5fa041b-dirty",
     "project_path":       "/Users/jameswjohnson/Documents/ESP32/touchExplore",
     "idf_path":           "/Users/jameswjohnson/.platformio/packages/framework-espidf",
     "build_dir":          "/Users/jameswjohnson/Documents/ESP32/touchExplore/.pio/build/esp32s3box",

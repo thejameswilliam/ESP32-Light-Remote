@@ -7,10 +7,13 @@
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_check.h"
+#include "esp_lcd_io_i2c.h"
 #include "esp_lcd_panel_io_interface.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "esp_lcd_touch.h"
+#include "esp_lcd_touch_cst816s.h"
 #include "esp_lvgl_port.h"
 #include "drivers/lcd/port/esp_lcd_st7701.h"
 #include "drivers/lcd/port/esp_panel_lcd_vendor_types.h"
@@ -23,6 +26,7 @@ constexpr const char *kTag = "display";
 constexpr gpio_num_t kPanelSpiClockGpio = GPIO_NUM_2;
 constexpr gpio_num_t kPanelSpiDataGpio = GPIO_NUM_1;
 constexpr gpio_num_t kBacklightGpio = GPIO_NUM_6;
+constexpr gpio_num_t kTouchInterruptGpio = GPIO_NUM_16;
 
 constexpr uint8_t kExpanderAddress = 0x20;
 constexpr uint8_t kExpanderRegOutput = 0x01;
@@ -34,6 +38,8 @@ constexpr uint8_t kExpanderBitLcdCs = 2;
 constexpr uint8_t kExpanderBitBuzzer = 7;
 constexpr bool kBuzzerIdleLevel = false;
 constexpr bool kBuzzerActiveLevel = true;
+// On this board the touch IRQ idles high and asserts low on touch.
+constexpr int kTouchInterruptActiveLevel = 0;
 
 constexpr uint16_t kDisplayWidth = 480;
 constexpr uint16_t kDisplayHeight = 480;
@@ -92,6 +98,11 @@ static const esp_panel_lcd_vendor_init_cmd_t kPanelInitCommands[] = {
     {0x20, (uint8_t[]){0x00}, 0, 120},
     {0x29, (uint8_t[]){0x00}, 0, 0},
 };
+
+bool is_touch_interrupt_active()
+{
+    return gpio_get_level(kTouchInterruptGpio) == kTouchInterruptActiveLevel;
+}
 
 uint8_t s_expander_output = 0x07;
 
@@ -424,6 +435,112 @@ esp_err_t init_lvgl(DisplayStack &stack)
     return ESP_OK;
 }
 
+void lvgl_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
+{
+    auto *stack = static_cast<DisplayStack *>(lv_indev_get_driver_data(indev));
+    if ((stack == nullptr) || (stack->touch == nullptr)) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    if (!is_touch_interrupt_active()) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    const esp_err_t read_err = esp_lcd_touch_read_data(stack->touch);
+    if (read_err != ESP_OK) {
+        static uint32_t error_log_count = 0;
+        if (error_log_count < 5) {
+            ESP_LOGW(kTag, "touch read failed err=0x%x", read_err);
+            ++error_log_count;
+        }
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    uint16_t x = 0;
+    uint16_t y = 0;
+    uint16_t strength = 0;
+    uint8_t points = 0;
+    const bool touched = esp_lcd_touch_get_coordinates(stack->touch, &x, &y, &strength, &points, 1);
+    if (!touched || (points == 0)) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    data->point.x = x;
+    data->point.y = y;
+    data->state = LV_INDEV_STATE_PRESSED;
+}
+
+void IRAM_ATTR touch_interrupt_callback(esp_lcd_touch_handle_t tp)
+{
+    auto *stack = static_cast<DisplayStack *>(tp->config.user_data);
+    if ((stack == nullptr) || (stack->touch_indev == nullptr)) {
+        return;
+    }
+
+    lvgl_port_task_wake(LVGL_PORT_EVENT_TOUCH, stack->touch_indev);
+}
+
+esp_err_t init_touch(DisplayStack &stack)
+{
+    ESP_LOGI(kTag, "touch init start");
+
+    const esp_lcd_panel_io_i2c_config_t touch_io_cfg = {
+        .dev_addr = ESP_LCD_TOUCH_IO_I2C_CST816S_ADDRESS,
+        .control_phase_bytes = 1,
+        .dc_bit_offset = 0,
+        .lcd_cmd_bits = 8,
+        .flags = {
+            .disable_control_phase = 1,
+        },
+        .scl_speed_hz = 400000,
+    };
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(stack.i2c_bus, &touch_io_cfg, &stack.touch_io), kTag, "touch io init failed");
+
+    const esp_lcd_touch_config_t touch_cfg = {
+        .x_max = kDisplayWidth,
+        .y_max = kDisplayHeight,
+        .rst_gpio_num = GPIO_NUM_NC,
+        .int_gpio_num = kTouchInterruptGpio,
+        .levels = {
+            .reset = 0,
+            .interrupt = kTouchInterruptActiveLevel,
+        },
+        .flags = {
+            .swap_xy = 0,
+            .mirror_x = 0,
+            .mirror_y = 0,
+        },
+        .process_coordinates = nullptr,
+        .interrupt_callback = nullptr,
+        .user_data = nullptr,
+        .driver_data = nullptr,
+    };
+    ESP_RETURN_ON_ERROR(esp_lcd_touch_new_i2c_cst816s(stack.touch_io, &touch_cfg, &stack.touch), kTag, "touch driver init failed");
+    ESP_RETURN_ON_ERROR(gpio_set_pull_mode(kTouchInterruptGpio, GPIO_PULLUP_ONLY), kTag, "touch irq pull-up failed");
+
+    ESP_RETURN_ON_FALSE(lvgl_port_lock(0), ESP_ERR_TIMEOUT, kTag, "lvgl lock failed");
+    stack.touch_indev = lv_indev_create();
+    lv_indev_set_type(stack.touch_indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_mode(stack.touch_indev, LV_INDEV_MODE_EVENT);
+    lv_indev_set_disp(stack.touch_indev, stack.display);
+    lv_indev_set_read_cb(stack.touch_indev, lvgl_touchpad_read);
+    lv_indev_set_driver_data(stack.touch_indev, &stack);
+    lvgl_port_unlock();
+
+    ESP_RETURN_ON_ERROR(
+        esp_lcd_touch_register_interrupt_callback_with_data(stack.touch, touch_interrupt_callback, &stack),
+        kTag,
+        "touch interrupt register failed"
+    );
+
+    ESP_LOGI(kTag, "touch ready");
+    return ESP_OK;
+}
+
 } // namespace
 
 esp_err_t initialize_display(DisplayStack &stack)
@@ -445,6 +562,7 @@ esp_err_t initialize_display(DisplayStack &stack)
 
     ESP_LOGI(kTag, "panel ready handle=%p", static_cast<void *>(stack.panel));
     ESP_RETURN_ON_ERROR(init_lvgl(stack), kTag, "lvgl init failed");
+    ESP_RETURN_ON_ERROR(init_touch(stack), kTag, "touch init failed");
     return ESP_OK;
 }
 

@@ -221,16 +221,13 @@ static esp_err_t panel_st7701_send_init_cmds(st7701_panel_t *st7701)
     bool is_command2_disable = true;
     bool is_cmd_overwritten = false;
 
-    ESP_LOGI(TAG, "init cmds: unlock command2");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, ST7701_CMD_CND2BKxSEL, (uint8_t []) {
         ST7701_CMD_BKxSEL_BYTE0, ST7701_CMD_BKxSEL_BYTE1, ST7701_CMD_BKxSEL_BYTE2, ST7701_CMD_BKxSEL_BYTE3, 0x00
     }, 5), TAG, "Write cmd failed");
     // Set color format
-    ESP_LOGI(TAG, "init cmds: MADCTL=%02X", st7701->madctl_val);
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, LCD_CMD_MADCTL, (uint8_t []) {
         st7701->madctl_val
     }, 1), TAG, "Write cmd failed");
-    ESP_LOGI(TAG, "init cmds: COLMOD=%02X", st7701->colmod_val);
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, LCD_CMD_COLMOD, (uint8_t []) {
         st7701->colmod_val
     }, 1), TAG, "Write cmd failed");
@@ -270,8 +267,6 @@ static esp_err_t panel_st7701_send_init_cmds(st7701_panel_t *st7701)
         }
 
         // Send command
-        ESP_LOGI(TAG, "init cmds[%d/%d]: cmd=%02X bytes=%u delay=%u", i + 1, init_cmds_size, init_cmds[i].cmd,
-                 init_cmds[i].data_bytes, init_cmds[i].delay_ms);
         ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, init_cmds[i].cmd, init_cmds[i].data, init_cmds[i].data_bytes),
                             TAG, "send command failed");
         vTaskDelay(pdMS_TO_TICKS(init_cmds[i].delay_ms));
@@ -291,14 +286,10 @@ static esp_err_t panel_st7701_init(esp_lcd_panel_t *panel)
     st7701_panel_t *st7701 = (st7701_panel_t *)panel->user_data;
 
     if (!st7701->flags.enable_io_multiplex) {
-        ESP_LOGI(TAG, "panel init: sending control commands");
         ESP_RETURN_ON_ERROR(panel_st7701_send_init_cmds(st7701), TAG, "send init commands failed");
-        ESP_LOGI(TAG, "panel init: control commands done");
     }
     // Init RGB panel
-    ESP_LOGI(TAG, "panel init: rgb panel init begin");
     ESP_RETURN_ON_ERROR(st7701->init(panel), TAG, "init RGB panel failed");
-    ESP_LOGI(TAG, "panel init: rgb panel init done");
 
     return ESP_OK;
 }
